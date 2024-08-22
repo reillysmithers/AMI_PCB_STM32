@@ -35,6 +35,34 @@ void ami_main(void) {
 	//First check if we have pushed the button
 }
 
+//Button press callback
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	//This here may not be necessary
+    if (GPIO_Pin == GPIO_PIN_7)  // Replace BUTTON_PIN with your actual GPIO pin number
+    {
+        // Debounce delay
+        HAL_Delay(50);
+
+        // Check if button is still pressed (optional)
+        if(HAL_GPIO_ReadPin(GPIOx, GPIO_PIN) == GPIO_PIN_SET) // Replace GPIOx and GPIO_PIN with actual values
+        {
+            // Toggle mode
+            mode = !mode;
+
+            // Implement mode-specific behavior
+            if (mode)
+            {
+                // Enter new mode
+            }
+            else
+            {
+                // Exit new mode
+            }
+        }
+    }
+}
+
 //Reads latest encoder values
 void updateEncoders(void) {
 	//Deal with unsigned int wraparound, it would be
