@@ -7,9 +7,33 @@
 
 #include "stm32f4xx_hal.h"
 
-encoder_position = 0;
+int encoder_position = 0;
 
-HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
+//GPIO Pins for leds in index order (so LED 1 equals index 0)
+GPIO_TypeDef* GPIO_Ports[] = {GPIOC, GPIOB, GPIOB, GPIOB, GPIOC, GPIOC, GPIOA};
+uint16_t GPIO_Pins[] = {GPIO_PIN_13, GPIO_PIN_9, GPIO_PIN_8, GPIO_PIN_6, GPIO_PIN_11, GPIO_PIN_10, GPIO_PIN_10};
+
+//For LED pulsing case
+int led_pulsing_idx = 0; // Which pin to pulse LED on?
+int led_pulsing_flag = 0; // Are we pulsing an LED (0 - no, 1 - slow, 2 - fast)
+
+//Timer callback
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  // Check which version of the timer triggered this callback and toggle LED
+  if (htim == &htim2)
+  {
+	//Check if we are pulsing (at speed 1, the slower speed, trigged on Timer 2)
+	if (led_pulsing_flag == 1) {
+		//Toggle the LED on/off
+		HAL_GPIO_TogglePin(GPIO_Ports[led_pulsing_idx-1], GPIO_Pins[led_pulsing_idx-1]);
+	}
+  }
+}
+
+void ami_main(void) {
+	//First check if we have pushed the button
+}
 
 //Reads latest encoder values
 void updateEncoders(void) {
@@ -23,27 +47,17 @@ void updateEncoders(void) {
 	}
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  // Check which version of the timer triggered this callback and toggle LED
-  if (htim == &htim16 )
-  {
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-  }
-}
-
-
 //LED states
 //0 - Off
-//1
+//1 - On
 //2 - Flash slow (Selection mode)
 //3 - flash fast (Pending Jetson Confirmation)
-
 void switchLED(int ledId, int state) {
-    GPIO_TypeDef* GPIO_Ports[] = {GPIOC, GPIOB, GPIOB, GPIOB, GPIOC, GPIOC, GPIOA};
-    uint16_t GPIO_Pins[] = {GPIO_PIN_13, GPIO_PIN_9, GPIO_PIN_8, GPIO_PIN_6, GPIO_PIN_11, GPIO_PIN_10, GPIO_PIN_10};
-
-    if (ledId >= 1 && ledId <= 7) {
+	if (state > 1) {
+		led_pulsing_idx = ledId;
+		led_pulsing_flag = 0;
+	}
+	else if (ledId >= 1 && ledId <= 7) {
         HAL_GPIO_WritePin(GPIO_Ports[ledId - 1], GPIO_Pins[ledId - 1], state == 1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
     }
 }
