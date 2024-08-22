@@ -7,7 +7,8 @@
 
 #include "stm32f4xx_hal.h"
 
-int encoder_position = 0;
+int encoder_position = 0; //Encoder position
+int encoder_zero = 0; //Position of encoder when we toggle (the new zero point)
 
 //GPIO Pins for leds in index order (so LED 1 equals index 0)
 GPIO_TypeDef* GPIO_Ports[] = {GPIOC, GPIOB, GPIOB, GPIOB, GPIOC, GPIOC, GPIOA};
@@ -16,6 +17,21 @@ uint16_t GPIO_Pins[] = {GPIO_PIN_13, GPIO_PIN_9, GPIO_PIN_8, GPIO_PIN_6, GPIO_PI
 //For LED pulsing case
 int led_pulsing_idx = 0; // Which pin to pulse LED on?
 int led_pulsing_flag = 0; // Are we pulsing an LED (0 - no, 1 - slow, 2 - fast)
+
+//Modes
+int selection_mode = 0;
+int selection_allowed = 1;
+
+//The main loop
+void ami_main(void) {
+	//Check if we are selecting
+	while (1) {
+		if (selection_mode == 1) {
+			led_pulsing_flag = 1;
+
+		}
+	}
+}
 
 //Timer callback
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -31,36 +47,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
 }
 
-void ami_main(void) {
-	//First check if we have pushed the button
-}
-
-//Button press callback
+//Button press callback, theres only one of these so we don't need to check pin
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	//This here may not be necessary
-    if (GPIO_Pin == GPIO_PIN_7)  // Replace BUTTON_PIN with your actual GPIO pin number
-    {
-        // Debounce delay
-        HAL_Delay(50);
-
-        // Check if button is still pressed (optional)
-        if(HAL_GPIO_ReadPin(GPIOx, GPIO_PIN) == GPIO_PIN_SET) // Replace GPIOx and GPIO_PIN with actual values
-        {
-            // Toggle mode
-            mode = !mode;
-
-            // Implement mode-specific behavior
-            if (mode)
-            {
-                // Enter new mode
-            }
-            else
-            {
-                // Exit new mode
-            }
-        }
-    }
+	// Debounce delay
+	HAL_Delay(50);
+	// Check if button is still pressed (optional)
+	if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET) // Replace GPIOx and GPIO_PIN with actual values
+	{
+		//Toggle mode if allowed too or already in mode
+		if (selection_allowed == 1 || selection_mode == 1) {
+			//Toggle selection mode and zero out encoder
+			selection_mode = !selection_mode;
+			encoder_zero = encoder_position;
+		}
+	}
 }
 
 //Reads latest encoder values
