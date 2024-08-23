@@ -32,7 +32,7 @@ int encoder_zero = 0; //Position of encoder when we toggle (the new zero point)
 //GPIO Pins for leds in index order (so LED 1 equals index 0)
 GPIO_TypeDef *GPIO_Ports[] = { GPIOC, GPIOB, GPIOB, GPIOB, GPIOC, GPIOC, GPIOA };
 uint16_t GPIO_Pins[] = { GPIO_PIN_13, GPIO_PIN_9, GPIO_PIN_8, GPIO_PIN_6,
-		GPIO_PIN_11, GPIO_PIN_10, GPIO_PIN_10 };
+GPIO_PIN_11, GPIO_PIN_10, GPIO_PIN_10 };
 
 //For LED pulsing case
 int led_cursor_idx = 1; // Which pin to pulse LED on?
@@ -76,7 +76,7 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void updateEncoders(void);
 void switchLED(int ledId, int state);
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 /* USER CODE END PFP */
 
@@ -156,7 +156,7 @@ int main(void) {
 			//Turn everything but the cursor and selected led
 			for (int i = 1; i <= 7; i++) {
 				if (i != led_idx && i != led_cursor_idx) {
-					//switchLED(i, 0);
+					switchLED(i, 0);
 				}
 			}
 		} else {
@@ -167,7 +167,7 @@ int main(void) {
 			//Turn everything else off
 			for (int i = 1; i <= 7; i++) {
 				if (i != led_idx) {
-					//switchLED(i, 0);
+					switchLED(i, 0);
 				}
 			}
 		}
@@ -401,6 +401,10 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+	/* EXTI interrupt init*/
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */
 }
@@ -421,29 +425,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 //Button press callback, theres only one of these so we don't need to check pin
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	switchLED(5, 0);
-	// Debounce delay
-	HAL_Delay(30);
-	// Check if button is still pressed (optional)
-	if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET) // Replace GPIOx and GPIO_PIN with actual values
-			{
-		//Toggle mode if allowed too or already in mode
-		if (selection_allowed == 1 || selection_mode == 1) {
-			//Toggle selection mode
-			if (selection_mode == 1) {
-				//We are turning off selection mode
-				//Fast blink (add this)
-				//Wait for Jetson (add this)
-				led_idx = led_cursor_idx; //Lock in the new solid LED index
-				selection_mode = 0; //Turn off selection mode
-			} else {
-				//We are turning on selection mode
-				//Zero out encoder (taking into consideration current LED index)
-				encoder_zero = encoder_position - 20 * (led_idx - 1);
-				selection_mode = 1;
-			}
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	//Toggle mode if allowed too or already in mode
+	if (selection_allowed == 1 || selection_mode == 1) {
+		//Toggle selection mode
+		if (selection_mode == 1) {
+			//We are turning off selection mode
+			//Fast blink (add this)
+			//Wait for Jetson (add this)
+			led_idx = led_cursor_idx; //Lock in the new solid LED index
+			selection_mode = 0; //Turn off selection mode
+		} else {
+			//We are turning on selection mode
+			//Zero out encoder (taking into consideration current LED index)
+			encoder_zero = encoder_position - 20 * (led_idx - 1);
+			selection_mode = 1;
 		}
 	}
 }
