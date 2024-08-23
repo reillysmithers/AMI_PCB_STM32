@@ -156,7 +156,7 @@ int main(void) {
 			//Turn everything but the cursor and selected led
 			for (int i = 1; i <= 7; i++) {
 				if (i != led_idx && i != led_cursor_idx) {
-					switchLED(i, 0);
+					//switchLED(i, 0);
 				}
 			}
 		} else {
@@ -167,7 +167,7 @@ int main(void) {
 			//Turn everything else off
 			for (int i = 1; i <= 7; i++) {
 				if (i != led_idx) {
-					switchLED(i, 0);
+					//switchLED(i, 0);
 				}
 			}
 		}
@@ -422,6 +422,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 //Button press callback, theres only one of these so we don't need to check pin
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	switchLED(5, 0);
 	// Debounce delay
 	HAL_Delay(30);
 	// Check if button is still pressed (optional)
