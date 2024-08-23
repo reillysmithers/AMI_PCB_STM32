@@ -45,6 +45,9 @@ int selection_allowed = 1;
 //Current led index (index of solid LED, must start at 1)
 int led_idx = 1;
 
+//Last interrupt time for debouncing button
+volatile uint32_t last_interrupt_time = 0;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -132,17 +135,17 @@ int main(void) {
 
 			//Set cursor index
 			int normalised_encoder_pos = encoder_position - encoder_zero;
-			if (normalised_encoder_pos < 20) {
+			if (normalised_encoder_pos < 10) {
 				led_cursor_idx = 1;
-			} else if (normalised_encoder_pos < 40) {
+			} else if (normalised_encoder_pos < 20) {
 				led_cursor_idx = 2;
-			} else if (normalised_encoder_pos < 60) {
+			} else if (normalised_encoder_pos < 30) {
 				led_cursor_idx = 3;
-			} else if (normalised_encoder_pos < 80) {
+			} else if (normalised_encoder_pos < 40) {
 				led_cursor_idx = 4;
-			} else if (normalised_encoder_pos < 100) {
+			} else if (normalised_encoder_pos < 50) {
 				led_cursor_idx = 5;
-			} else if (normalised_encoder_pos < 120) {
+			} else if (normalised_encoder_pos < 60) {
 				led_cursor_idx = 6;
 			} else {
 				led_cursor_idx = 7;
@@ -276,7 +279,7 @@ static void MX_TIM2_Init(void) {
 	htim2.Instance = TIM2;
 	htim2.Init.Prescaler = 8000;
 	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim2.Init.Period = 10000 - 1;
+	htim2.Init.Period = 2000;
 	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
@@ -428,19 +431,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	//Toggle mode if allowed too or already in mode
-	if (selection_allowed == 1 || selection_mode == 1) {
-		//Toggle selection mode
-		if (selection_mode == 1) {
-			//We are turning off selection mode
-			//Fast blink (add this)
-			//Wait for Jetson (add this)
-			led_idx = led_cursor_idx; //Lock in the new solid LED index
-			selection_mode = 0; //Turn off selection mode
-		} else {
-			//We are turning on selection mode
-			//Zero out encoder (taking into consideration current LED index)
-			encoder_zero = encoder_position - 20 * (led_idx - 1);
-			selection_mode = 1;
+	if (HAL_GetTick() - last_interrupt_time > 90) {
+		last_interrupt_time = HAL_GetTick();
+		if (selection_allowed == 1 || selection_mode == 1) {
+			//Toggle selection mode
+			if (selection_mode == 1) {
+				//We are turning off selection mode
+				//Fast blink (add this)
+				//Wait for Jetson (add this)
+				led_idx = led_cursor_idx; //Lock in the new solid LED index
+				selection_mode = 0; //Turn off selection mode
+			} else {
+				//We are turning on selection mode
+				//Zero out encoder (taking into consideration current LED index)
+				encoder_zero = encoder_position - 10 * (led_idx - 1);
+				selection_mode = 1;
+			}
 		}
 	}
 }
