@@ -480,6 +480,32 @@ void switchLED(int ledId, int state) {
 	}
 }
 
+// Function to send only the Mission_Selected signal
+void Send_Mission_Selected(uint8_t mission_selected) {
+    CAN_TxHeaderTypeDef TxHeader;
+    uint32_t TxMailbox;
+    uint8_t CAN_Message[6] = {0};  // Initialize all bytes to 0
+
+    // Set up the CAN message header
+    TxHeader.StdId = 1298;         // Standard Identifier from DBC
+    TxHeader.ExtId = 0x01;         // Not used (standard ID)
+    TxHeader.RTR = CAN_RTR_DATA;   // Data frame
+    TxHeader.IDE = CAN_ID_STD;     // Standard ID
+    TxHeader.DLC = 6;              // Data length (6 bytes)
+    TxHeader.TransmitGlobalTime = DISABLE;
+
+    // Set the Mission_Selected signal in the appropriate bits
+    CAN_Message[0] = (mission_selected & 0x07) << 3; // Mission_Selected in bits 3-5 of byte 0
+
+    // Other bytes remain 0 (or you can set them to default values)
+
+    // Transmit the CAN message
+    if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, CAN_Message, &TxMailbox) != HAL_OK) {
+        // Transmission request error handling
+        Error_Handler();
+    }
+}
+
 /* USER CODE END 4 */
 
 /**
