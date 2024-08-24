@@ -48,6 +48,9 @@ int led_idx = 1;
 //Last interrupt time for debouncing button
 volatile uint32_t last_interrupt_time = 0;
 
+//The current mission selected, only the Jetson can update this
+uint8_t missionSelected = 1;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -79,7 +82,7 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 void updateEncoders(void);
 void switchLED(int ledId, int state);
-//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+void sendMission(int mission);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 /* USER CODE END PFP */
 
@@ -120,6 +123,10 @@ int main(void) {
 	MX_CAN1_Init();
 	MX_TIM2_Init();
 	/* USER CODE BEGIN 2 */
+	if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING)
+			!= HAL_OK) {
+		Error_Handler();
+	}
 
 	/* USER CODE END 2 */
 
@@ -422,6 +429,19 @@ static void MX_GPIO_Init(void) {
 
 /* USER CODE BEGIN 4 */
 
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+	CAN_RxHeaderTypeDef rxHeader;
+	uint8_t rxData[8];
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
+		Error_Handler();
+	}
+	if ((RxHeader.StdId == 1298)) {
+		missionSelected = (rxData[0] >> MISSION_SELECTED_POSITION)
+				& ((1 << MISSION_SELECTED_LENGTH) - 1);
+		datacheck = 1;
+	}
+}
+
 //Timer callback
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	// Check which version of the timer triggered this callback and toggle LED
@@ -445,7 +465,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			//Toggle selection mode
 			if (selection_mode == 1) {
 				//We are turning off selection mode
-				//Fast blink (add this)
+				//Send mission to Jetson
+				sendMission(led_cursor_idx);
+				//Blink fast and wait for Jetson to receive message
 				//Wait for Jetson (add this)
 				selection_mode = 0; //Turn off selection mode
 				led_idx = led_cursor_idx; //Lock in the new solid LED index
@@ -480,30 +502,32 @@ void switchLED(int ledId, int state) {
 	}
 }
 
-// Function to send only the Mission_Selected signal
-void Send_Mission_Selected(uint8_t mission_selected) {
-    CAN_TxHeaderTypeDef TxHeader;
-    uint32_t TxMailbox;
-    uint8_t CAN_Message[6] = {0};  // Initialize all bytes to 0
+// Function to send the mission data over CAN
+void sendMission(int mission) {
+	// Ensure the mission value fits within 3 bits (0 to 7)
+	uint8_t selected_mission = mission & 0x07; // Mask to 3 bits
 
-    // Set up the CAN message header
-    TxHeader.StdId = 1298;         // Standard Identifier from DBC
-    TxHeader.ExtId = 0x01;         // Not used (standard ID)
-    TxHeader.RTR = CAN_RTR_DATA;   // Data frame
-    TxHeader.IDE = CAN_ID_STD;     // Standard ID
-    TxHeader.DLC = 6;              // Data length (6 bytes)
-    TxHeader.TransmitGlobalTime = DISABLE;
+	// Create a CAN message
+	CAN_TxHeaderTypeDef TxHeader;
+	uint8_t TxData[1];  // Message length is 1 byte
+	uint32_t TxMailbox;
 
-    // Set the Mission_Selected signal in the appropriate bits
-    CAN_Message[0] = (mission_selected & 0x07) << 3; // Mission_Selected in bits 3-5 of byte 0
+	// Configure the CAN message ID and DLC
+	TxHeader.StdId = 0x0510;        // Standard ID (message ID from DBC)
+	TxHeader.ExtId = 0x00;          // Extended ID not used
+	TxHeader.IDE = CAN_ID_STD;      // Standard identifier
+	TxHeader.RTR = CAN_RTR_DATA;    // Data frame
+	TxHeader.DLC = 1;               // Data length code (1 byte)
+	TxHeader.TransmitGlobalTime = DISABLE;
 
-    // Other bytes remain 0 (or you can set them to default values)
+	// Prepare the data to send
+	TxData[0] = selected_mission;
 
-    // Transmit the CAN message
-    if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, CAN_Message, &TxMailbox) != HAL_OK) {
-        // Transmission request error handling
-        Error_Handler();
-    }
+	// Send the CAN message
+	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
+		// Transmission error
+		Error_Handler();
+	}
 }
 
 /* USER CODE END 4 */
