@@ -51,6 +51,9 @@ volatile uint32_t last_interrupt_time = 0;
 //The current mission selected, only the Jetson can update this
 uint8_t missionSelected = 1;
 
+//The current AS state, only other devices on the CAN bus can update this
+uint8_t globalASState = 0;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -436,8 +439,11 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 		Error_Handler();
 	}
 	if ((rxHeader.StdId == 1298)) {
-		//Read in mission selected
+		// Read in Mission_Selected
 		missionSelected = (rxData[0] >> 3) & ((1 << 3) - 1);
+	} else if (rxHeader.StdId == 1282) {
+		// Read in AS_State
+		globalASState = (rxData[0] >> 0) & ((1 << 3) - 1);
 	}
 }
 
@@ -466,8 +472,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				//We are turning off selection mode
 				//Send mission to Jetson
 				sendMission(led_cursor_idx);
-				//Blink fast and wait for Jetson to receive message
-				//Wait for Jetson (add this)
+				int pulser = 0;
+				//Wait until mission selected is confirmed
+				while (missionSelected != led_cursor_idx) {
+					led_cursor_flag = 0;
+					switchLED(led_cursor_idx,pulser);
+					pulser = !pulser;
+					HAL_Delay(100);
+				}
 				selection_mode = 0; //Turn off selection mode
 				led_idx = led_cursor_idx; //Lock in the new solid LED index
 
