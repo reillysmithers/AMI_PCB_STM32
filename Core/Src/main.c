@@ -54,6 +54,8 @@ uint8_t missionSelected = 1;
 //The current AS state, only other devices on the CAN bus can update this
 uint8_t globalASState = 0;
 
+int jetson_wait_flag = 0;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -139,7 +141,7 @@ int main(void) {
 		//Update encoders
 		updateEncoders();
 		//Check if we are selecting
-		if (selection_mode == 1) {
+		if (selection_mode == 1 && jetson_wait_flag == 0) {
 			//We are using a cursor
 			led_cursor_flag = 1;
 
@@ -180,7 +182,7 @@ int main(void) {
 					switchLED(i, 0);
 				}
 			}
-		} else {
+		} else if (jetson_wait_flag == 0) {
 			//Turn off cursor
 			led_cursor_flag = 0;
 			//Turn the current LED on solid
@@ -471,15 +473,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			if (selection_mode == 1) {
 				//We are turning off selection mode
 				//Send mission to Jetson
-				sendMission(led_cursor_idx);
-				int pulser = 0;
+				//sendMission(led_cursor_idx);
 				//Wait until mission selected is confirmed
+				jetson_wait_flag = 1;
+				led_cursor_flag = 0;
 				while (missionSelected != led_cursor_idx) {
-					led_cursor_flag = 0;
-					switchLED(led_cursor_idx,pulser);
-					pulser = !pulser;
+					HAL_GPIO_TogglePin(GPIO_Ports[led_cursor_idx - 1],
+										GPIO_Pins[led_cursor_idx - 1]);
 					HAL_Delay(100);
+
 				}
+				jetson_wait_flag = 0;
 				selection_mode = 0; //Turn off selection mode
 				led_idx = led_cursor_idx; //Lock in the new solid LED index
 
@@ -551,6 +555,8 @@ void Error_Handler(void) {
 	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
+	switchLED(7,1);
+	jetson_wait_flag = 1;
 	while (1) {
 	}
 	/* USER CODE END Error_Handler_Debug */
