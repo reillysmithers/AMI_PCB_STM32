@@ -432,13 +432,12 @@ static void MX_GPIO_Init(void) {
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 	CAN_RxHeaderTypeDef rxHeader;
 	uint8_t rxData[8];
-	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK) {
+	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData) != HAL_OK) {
 		Error_Handler();
 	}
-	if ((RxHeader.StdId == 1298)) {
-		missionSelected = (rxData[0] >> MISSION_SELECTED_POSITION)
-				& ((1 << MISSION_SELECTED_LENGTH) - 1);
-		datacheck = 1;
+	if ((rxHeader.StdId == 1298)) {
+		//Read in mission selected
+		missionSelected = (rxData[0] >> 3) & ((1 << 3) - 1);
 	}
 }
 
