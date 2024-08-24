@@ -137,6 +137,11 @@ int main(void) {
 			int normalised_encoder_pos = encoder_position - encoder_zero;
 			if (normalised_encoder_pos < 10) {
 				led_cursor_idx = 1;
+				//Stop the encoder from spinning crazy one way
+				//and taking ages to recover
+				if (normalised_encoder_pos < 0) {
+					encoder_zero = encoder_position;
+				}
 			} else if (normalised_encoder_pos < 20) {
 				led_cursor_idx = 2;
 			} else if (normalised_encoder_pos < 30) {
@@ -149,6 +154,9 @@ int main(void) {
 				led_cursor_idx = 6;
 			} else {
 				led_cursor_idx = 7;
+				if (normalised_encoder_pos > 70) {
+					encoder_zero = encoder_position - 70;
+				}
 			}
 
 			//So long as the selected LED is not the cursor, turn it on solid
@@ -279,7 +287,7 @@ static void MX_TIM2_Init(void) {
 	htim2.Instance = TIM2;
 	htim2.Init.Prescaler = 8000;
 	htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim2.Init.Period = 2000;
+	htim2.Init.Period = 1400;
 	htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
@@ -333,7 +341,7 @@ static void MX_TIM3_Init(void) {
 	sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
 	sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
 	sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-	sConfig.IC2Filter = 10;
+	sConfig.IC2Filter = 0;
 	if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK) {
 		Error_Handler();
 	}
@@ -431,7 +439,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	//Toggle mode if allowed too or already in mode
-	if (HAL_GetTick() - last_interrupt_time > 90) {
+	if (HAL_GetTick() - last_interrupt_time > 200) {
 		last_interrupt_time = HAL_GetTick();
 		if (selection_allowed == 1 || selection_mode == 1) {
 			//Toggle selection mode
@@ -439,8 +447,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				//We are turning off selection mode
 				//Fast blink (add this)
 				//Wait for Jetson (add this)
-				led_idx = led_cursor_idx; //Lock in the new solid LED index
 				selection_mode = 0; //Turn off selection mode
+				led_idx = led_cursor_idx; //Lock in the new solid LED index
+
 			} else {
 				//We are turning on selection mode
 				//Zero out encoder (taking into consideration current LED index)
