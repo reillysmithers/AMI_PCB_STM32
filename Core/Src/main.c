@@ -128,6 +128,9 @@ int main(void) {
 	MX_CAN1_Init();
 	MX_TIM2_Init();
 	/* USER CODE BEGIN 2 */
+	//Set systick priority
+	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+
 	if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING)
 			!= HAL_OK) {
 		Error_Handler();
@@ -137,6 +140,33 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+	// CAN message structure
+	CAN_TxHeaderTypeDef TxHeader;
+	uint32_t TxMailbox;
+	uint8_t TxData[8];
+
+	TxHeader.DLC = 8;  // Data length: 8 bytes
+	TxHeader.ExtId = 0x01;  // Example extended ID
+	TxHeader.IDE = CAN_ID_EXT;
+	TxHeader.RTR = CAN_RTR_DATA;
+	TxHeader.TransmitGlobalTime = DISABLE;
+
+	// Example data to send
+	TxData[0] = 0xDE;
+	TxData[1] = 0xAD;
+	TxData[2] = 0xBE;
+	TxData[3] = 0xEF;
+	TxData[4] = 0x12;
+	TxData[5] = 0x34;
+	TxData[6] = 0x56;
+	TxData[7] = 0x78;
+
+	// Transmit the message
+	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
+		// Transmission error
+		Error_Handler();
+	}
+
 	while (1) {
 		//Update encoders
 		updateEncoders();
@@ -425,7 +455,7 @@ static void MX_GPIO_Init(void) {
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 	/* EXTI interrupt init*/
-	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 0);
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -439,6 +469,9 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 	uint8_t rxData[8];
 	if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData) != HAL_OK) {
 		Error_Handler();
+	}
+	while (1) {
+		switchLED(6, 1);
 	}
 	if ((rxHeader.StdId == 1298)) {
 		// Read in Mission_Selected
@@ -473,15 +506,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 			if (selection_mode == 1) {
 				//We are turning off selection mode
 				//Send mission to Jetson
-				//sendMission(led_cursor_idx);
+				sendMission(led_cursor_idx);
 				//Wait until mission selected is confirmed
 				jetson_wait_flag = 1;
 				led_cursor_flag = 0;
 				while (missionSelected != led_cursor_idx) {
 					HAL_GPIO_TogglePin(GPIO_Ports[led_cursor_idx - 1],
-										GPIO_Pins[led_cursor_idx - 1]);
-					HAL_Delay(100);
-
+							GPIO_Pins[led_cursor_idx - 1]);
+					HAL_Delay(50);
 				}
 				jetson_wait_flag = 0;
 				selection_mode = 0; //Turn off selection mode
@@ -494,6 +526,26 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				selection_mode = 1;
 			}
 		}
+	}
+}
+
+void CAN1_FilterConfig(void) {
+	CAN_FilterTypeDef sFilterConfig;
+
+	sFilterConfig.FilterBank = 0;
+	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+	sFilterConfig.FilterIdHigh = 0x0000;
+	sFilterConfig.FilterIdLow = 0x0000;
+	sFilterConfig.FilterMaskIdHigh = 0x0000;
+	sFilterConfig.FilterMaskIdLow = 0x0000;
+	sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
+	sFilterConfig.FilterActivation = ENABLE;
+	sFilterConfig.SlaveStartFilterBank = 14;
+
+	if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig) != HAL_OK) {
+		// Filter configuration error
+		Error_Handler();
 	}
 }
 
@@ -540,8 +592,14 @@ void sendMission(int mission) {
 
 	// Send the CAN message
 	if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
+
 		// Transmission error
 		Error_Handler();
+	} else {
+		while (1) {
+			switchLED(5, 1);
+		}
+
 	}
 }
 
@@ -555,7 +613,7 @@ void Error_Handler(void) {
 	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
-	switchLED(7,1);
+	switchLED(7, 1);
 	jetson_wait_flag = 1;
 	while (1) {
 	}
