@@ -145,9 +145,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 	while (1) {
-		//Add ability to get out of selection waiting
-		//Double click same state
-		//Update encoders
 		updateEncoders();
 		//Check if we are selecting
 		if (selection_mode == 1 && jetson_wait_flag == 0) {
@@ -181,7 +178,6 @@ int main(void)
 					encoder_zero = encoder_position;
 				}
 			}
-
 			//So long as the selected LED is not the cursor, turn it on solid
 			if (led_idx != led_cursor_idx) {
 				switchLED(led_idx, 1);
