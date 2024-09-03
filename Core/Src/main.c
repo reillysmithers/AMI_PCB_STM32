@@ -128,8 +128,6 @@ int main(void)
   MX_TIM3_Init();
   MX_CAN1_Init();
   MX_TIM2_Init();
-
-  HAL_CAN_Start(&hcan1);
   /* USER CODE BEGIN 2 */
 	//Set systick priority
 	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
@@ -159,7 +157,7 @@ int main(void)
 				//and taking ages to recover
 				if (normalised_encoder_pos < 0) {
 					//Should work for wraparound
-					encoder_zero = encoder_position + 70;
+					encoder_zero = encoder_position;
 				}
 			} else if (normalised_encoder_pos < 20) {
 				led_cursor_idx = 2;
@@ -175,7 +173,7 @@ int main(void)
 				led_cursor_idx = 7;
 				if (normalised_encoder_pos > 70) {
 					//Should work for wraparound
-					encoder_zero = encoder_position;
+					encoder_zero = encoder_position-70;
 				}
 			}
 			//So long as the selected LED is not the cursor, turn it on solid
