@@ -128,7 +128,6 @@ int main(void)
   MX_TIM3_Init();
   MX_CAN1_Init();
   MX_TIM2_Init();
-
   HAL_CAN_Start(&hcan1);
   /* USER CODE BEGIN 2 */
 	//Set systick priority
@@ -145,9 +144,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 	while (1) {
-		//Add ability to get out of selection waiting
-		//Double click same state
-		//Update encoders
 		updateEncoders();
 		//Check if we are selecting
 		if (selection_mode == 1 && jetson_wait_flag == 0) {
@@ -161,7 +157,8 @@ int main(void)
 				//Stop the encoder from spinning crazy one way
 				//and taking ages to recover
 				if (normalised_encoder_pos < 0) {
-					encoder_zero = encoder_position;
+					//Should work for wraparound
+					encoder_zero = encoder_position-70;
 				}
 			} else if (normalised_encoder_pos < 20) {
 				led_cursor_idx = 2;
@@ -176,10 +173,10 @@ int main(void)
 			} else {
 				led_cursor_idx = 7;
 				if (normalised_encoder_pos > 70) {
-					encoder_zero = encoder_position - 70;
+					//Should work for wraparound
+					encoder_zero = encoder_position;
 				}
 			}
-
 			//So long as the selected LED is not the cursor, turn it on solid
 			if (led_idx != led_cursor_idx) {
 				switchLED(led_idx, 1);
@@ -474,8 +471,6 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 		// Read in Mission_Selected
 		uint8_t x  = (rxData[0] & 0b00111000) >> 3;
 		missionSelected = x;
-//		x = x <<
-//		missionSelected = (rxData[0] >> 3) & ((1 << 3) - 1);
 
 	} else if (rxHeader.StdId == 1300) {
 		// Read in AS_State
@@ -503,20 +498,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 //Button press callback, theres only one of these so we don't need to check pin
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	//Toggle mode if allowed too or already in mode
-	if (HAL_GetTick() - last_interrupt_time > 200) {
+	//Software debouncing + ensure button is actually high, to prevent unintentional queuing of interrupt
+	if (HAL_GetTick() - last_interrupt_time > 200 && HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET) {
 		last_interrupt_time = HAL_GetTick();
+		//Check if either selection allowed or if we are
+		//already in mode, enter anyway so it can be turned off
 		if (selection_allowed == 1 || selection_mode == 1) {
-			//Toggle selection mode
+			//Turn off selection mode
 			if (selection_mode == 1) {
-				//We are turning off selection mode
-				//Send mission to Jetson
-				sendMission(led_cursor_idx);
-				//Wait until mission selected is confirmed
+				//Set mission selected to 0 whilst we wait
+				//missionSelected = 255;
 				jetson_wait_flag = 1;
 				led_cursor_flag = 0;
+				//Send mission to Jetson
+				sendMission(led_cursor_idx);
+				//Wait for mission to be selected
 				while (missionSelected != led_cursor_idx) {
 					HAL_GPIO_TogglePin(GPIO_Ports[led_cursor_idx - 1],
 							GPIO_Pins[led_cursor_idx - 1]);
@@ -524,12 +521,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 				}
 				jetson_wait_flag = 0;
 				selection_mode = 0; //Turn off selection mode
-				led_idx = led_cursor_idx; //Lock in the new solid LED index
-
-			} else {
-				//We are turning on selection mode
-				//Zero out encoder (taking into consideration current LED index)
-				encoder_zero = encoder_position - 10 * (led_idx - 1);
+				led_idx = missionSelected; //Lock in the new solid LED index
+			}
+			//Turn on selection mode
+			else {
+				encoder_zero = encoder_position - 10 * (led_idx - 1); //Zero encoder considering position/current LED
 				selection_mode = 1;
 			}
 		}
